@@ -1,0 +1,14 @@
+.git
+.venv
+.env
+runtime
+sample_files
+__pycache__
+.pytest_cache
+*.egg-info
+*.zip
+peer-data
+dist
+build
+.env.*
+!.env.example

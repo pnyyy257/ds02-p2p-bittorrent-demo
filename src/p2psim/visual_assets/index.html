@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>P2P Lab · BitTorrent trực quan</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="P2P Lab trang chủ"><span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span><span>P2P<span class="brand-light">LAB</span><small>BITTORRENT · LIVE DEMO</small></span></a>
+      <div class="header-context"><span class="header-chip">3 peers độc lập</span><span class="header-chip">HTTP thật</span><span class="connection" id="connection"><span class="dot"></span><span id="connection-text">Đang kết nối</span></span></div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <div><p class="eyebrow">HỆ PHÂN TÁN / P2P FILE SHARING</p><h1 id="page-title">Nhìn thấy từng chunk di chuyển<span>.</span></h1><p class="intro-copy">Theo dõi 3 peer truyền dữ liệu qua HTTP, kiểm tra SHA-256 và tự chuyển nguồn ngay trên máy của bạn.</p></div>
+        <div class="session-status" id="session-status"><span class="status-symbol" id="status-symbol">◌</span><div><span id="status-label">Sẵn sàng thử nghiệm</span><small id="status-detail">Chọn một kịch bản để bắt đầu</small></div></div>
+      </section>
+
+      <section class="scenario-section" aria-label="Chọn kịch bản demo">
+        <div class="section-line"><h2><span class="step">01</span> Kịch bản thử nghiệm</h2><span class="subtle">Chọn demo để xem mục tiêu và chạy</span></div>
+        <div class="scenario-grid" id="scenarios">
+          <button type="button" class="scenario selected" data-scenario="1" aria-pressed="true"><span class="scenario-top"><span class="scenario-index">DEMO 01</span><span class="scenario-glyph" aria-hidden="true">↘ ↙</span></span><strong>Tải từ nhiều nguồn</strong><span class="scenario-description">Peer B tải các chunk từ cả A và C</span><span class="scenario-foot">MULTI-SOURCE <span aria-hidden="true">↗</span></span></button>
+          <button type="button" class="scenario" data-scenario="2" aria-pressed="false"><span class="scenario-top"><span class="scenario-index">DEMO 02</span><span class="scenario-glyph" aria-hidden="true">⇄</span></span><strong>Vừa tải, vừa chia sẻ</strong><span class="scenario-description">B chia sẻ chunk cho C khi chưa tải xong</span><span class="scenario-foot">DOWNLOAD + UPLOAD <span aria-hidden="true">↗</span></span></button>
+          <button type="button" class="scenario" data-scenario="3" aria-pressed="false"><span class="scenario-top"><span class="scenario-index">DEMO 03</span><span class="scenario-glyph" aria-hidden="true">⊗</span></span><strong>Phát hiện chunk hỏng</strong><span class="scenario-description">B loại chunk sai hash và tải lại</span><span class="scenario-foot">INTEGRITY CHECK <span aria-hidden="true">↗</span></span></button>
+          <button type="button" class="scenario" data-scenario="4" aria-pressed="false"><span class="scenario-top"><span class="scenario-index">DEMO 04</span><span class="scenario-glyph" aria-hidden="true">⤳</span></span><strong>Tự chuyển nguồn tải</strong><span class="scenario-description">A dừng cấp dữ liệu, B tiếp tục tải từ C</span><span class="scenario-foot">FAULT TOLERANCE <span aria-hidden="true">↗</span></span></button>
+        </div>
+        <div class="source-picker" id="source-picker">
+          <div class="source-main"><span class="source-file-icon" aria-hidden="true">▤</span><div class="source-details"><div class="source-heading"><span>FILE DÙNG CHO CẢ 4 DEMO</span><span class="source-type" id="source-type">FILE MẪU</span></div><strong id="source-name">File mẫu tự động</strong><span id="source-meta">4 MiB · Tạo mới khi chạy demo</span></div><div class="source-actions"><input class="sr-only" id="source-input" type="file" tabindex="-1" aria-label="Chọn file cho demo"><button type="button" class="button secondary" id="choose-source" aria-controls="source-input"><span aria-hidden="true">↑</span> Chọn file</button><button type="button" class="source-reset" id="reset-source" disabled>Dùng file mẫu</button></div></div>
+          <div class="source-bottom"><p>PDF, DOC, DOCX hoặc file bất kỳ · 8 byte–32 MiB. File gốc chỉ đưa vào A; B và C nhận chunk qua HTTP.</p><span class="source-status" id="source-status" role="status" aria-live="polite">Sẵn sàng dùng file mẫu</span></div>
+          <div class="source-upload" id="source-upload" hidden><div class="source-progress" id="source-progress" role="progressbar" aria-label="Tiến độ gửi file" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="source-progress-fill"></span></div><span id="source-progress-text">0%</span></div>
+          <p class="source-error" id="source-error" role="alert" hidden></p>
+        </div>
+        <div class="run-bar"><p id="scenario-hint">A và C có sẵn file. B ghép các chunk nhận từ hai nguồn và kiểm tra hash toàn file.</p><div class="run-actions"><button type="button" class="button secondary" id="run-all">Chạy cả 4 demo</button><button type="button" class="button primary" id="run-selected"><span aria-hidden="true">▶</span> <span id="run-label">Chạy demo 1</span></button></div></div>
+      </section>
+
+      <div class="workspace">
+        <section class="network-panel panel" aria-labelledby="network-title">
+          <div class="panel-heading"><h2 id="network-title"><span class="step">02</span> Mạng P2P trực tiếp</h2><span class="live-badge" id="network-badge"><span class="dot"></span> CHỜ DEMO</span></div>
+          <div class="file-strip"><span class="file-icon" aria-hidden="true">▤</span><div class="file-name-wrap"><strong id="file-name">Chưa có file thử nghiệm</strong><span id="file-meta">File và kho dữ liệu riêng được tạo khi chạy demo</span></div><span class="protocol-pill">SHA-256</span></div>
+          <div class="network-canvas" id="network-canvas">
+            <svg id="connections" class="connections" aria-hidden="true"><defs><marker id="arrow-a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#5ce2c5"/></marker><marker id="arrow-b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#70b5ff"/></marker><marker id="arrow-c" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#b39aff"/></marker></defs><g id="tracker-lines"></g><g id="flow-lines"></g></svg>
+            <div class="tracker" id="tracker"><span class="tracker-icon" aria-hidden="true">⌘</span><div><strong>TRACKER</strong><span>Metadata &amp; danh sách chunk</span></div><span class="tracker-note">Không truyền file</span></div>
+            <div class="peers" id="peers">
+              <article class="peer peer-a" id="peer-a" aria-labelledby="peer-a-name"><div class="peer-header"><span class="peer-avatar">A</span><div><h3 id="peer-a-name">Peer A</h3><span class="peer-role" data-field="role">Nguồn dữ liệu</span></div><span class="peer-online" data-field="online">Chờ</span></div><div class="peer-progress"><strong data-field="percent">0<span>%</span></strong><div><span data-field="chunk-count">0 / 0 chunk</span><small data-field="state">Chưa khởi tạo</small></div></div><div class="progress-track"><span data-field="progress-bar"></span></div><div class="chunk-grid" data-field="chunks" aria-label="Các chunk đã xác thực của Peer A"></div><div class="peer-stats"><div><span>Đang upload</span><strong data-field="uploads">0</strong></div><div><span>Nguồn tải</span><strong data-field="sources">—</strong></div></div><div class="peer-footer" data-field="footer">Kho dữ liệu độc lập</div></article>
+              <article class="peer peer-b" id="peer-b" aria-labelledby="peer-b-name"><div class="peer-header"><span class="peer-avatar">B</span><div><h3 id="peer-b-name">Peer B</h3><span class="peer-role" data-field="role">Peer nhận file</span></div><span class="peer-online" data-field="online">Chờ</span></div><div class="peer-progress"><strong data-field="percent">0<span>%</span></strong><div><span data-field="chunk-count">0 / 0 chunk</span><small data-field="state">Chưa khởi tạo</small></div></div><div class="progress-track"><span data-field="progress-bar"></span></div><div class="chunk-grid" data-field="chunks" aria-label="Các chunk đã xác thực của Peer B"></div><div class="peer-stats"><div><span>Đang upload</span><strong data-field="uploads">0</strong></div><div><span>Nguồn tải</span><strong data-field="sources">—</strong></div></div><div class="peer-footer" data-field="footer">Kho dữ liệu độc lập</div></article>
+              <article class="peer peer-c" id="peer-c" aria-labelledby="peer-c-name"><div class="peer-header"><span class="peer-avatar">C</span><div><h3 id="peer-c-name">Peer C</h3><span class="peer-role" data-field="role">Peer trong mạng</span></div><span class="peer-online" data-field="online">Chờ</span></div><div class="peer-progress"><strong data-field="percent">0<span>%</span></strong><div><span data-field="chunk-count">0 / 0 chunk</span><small data-field="state">Chưa khởi tạo</small></div></div><div class="progress-track"><span data-field="progress-bar"></span></div><div class="chunk-grid" data-field="chunks" aria-label="Các chunk đã xác thực của Peer C"></div><div class="peer-stats"><div><span>Đang upload</span><strong data-field="uploads">0</strong></div><div><span>Nguồn tải</span><strong data-field="sources">—</strong></div></div><div class="peer-footer" data-field="footer">Kho dữ liệu độc lập</div></article>
+            </div>
+          </div>
+          <div class="network-legend"><span><i class="legend-square" style="background:var(--green);border-color:var(--green)"></i>Từ A</span><span><i class="legend-square filled"></i>Từ B</span><span><i class="legend-square" style="background:var(--purple);border-color:var(--purple)"></i>Từ C</span><span><i class="legend-square"></i>Chưa có</span><span><i class="legend-line"></i>Chunk đã nhận</span><span><i class="legend-line dashed"></i>Metadata</span></div>
+          <div class="phase-strip"><span class="phase-icon" aria-hidden="true">↳</span><div><strong id="phase-label">Sẵn sàng</strong><p id="phase-message">Mỗi demo chạy tracker và 3 peer độc lập. Tiến độ lấy từ chunk thực có trên từng peer.</p></div></div>
+        </section>
+
+        <aside class="evidence-panel panel" aria-labelledby="evidence-title"><div class="panel-heading"><h2 id="evidence-title"><span class="step">03</span> Kiểm chứng</h2><span class="evidence-count" id="evidence-count">0 điều kiện</span></div><p class="evidence-intro">Kết quả đối chiếu từ sự kiện truyền chunk và file nhận được.</p><div class="checks" id="checks"><div class="empty-check"><span aria-hidden="true">◎</span><strong>Chưa có lượt chạy</strong><p>Các điều kiện kiểm chứng sẽ xuất hiện trong lúc demo.</p></div></div><div class="artifact" id="artifact" hidden><div class="artifact-title"><span aria-hidden="true">✓</span><strong>File đầu ra đã xác thực</strong></div><span class="artifact-label">SHA-256 TOÀN FILE</span><code id="artifact-hash"></code><span class="artifact-label">ĐƯỜNG DẪN FILE</span><code id="artifact-path"></code><div class="artifact-downloads"><a class="button secondary artifact-download" id="download-b" href="/api/artifact/peer-b" download><span aria-hidden="true">↓</span> Tải file từ B</a><a class="button secondary artifact-download" id="download-c" href="/api/artifact/peer-c" download hidden><span aria-hidden="true">↓</span> Tải file từ C</a></div></div><div class="results" id="results" hidden></div><div class="error-box" id="error-box" role="alert" hidden></div><div class="evidence-note"><span aria-hidden="true">ⓘ</span><p>Chunk chỉ được tính vào tiến độ sau khi kiểm tra SHA-256. Mũi tên hiển thị các lượt nhận chunk thành công gần nhất.</p></div></aside>
+      </div>
+
+      <section class="timeline-panel panel" aria-labelledby="timeline-title"><div class="panel-heading"><h2 id="timeline-title"><span class="step">04</span> Nhật ký truyền dữ liệu</h2><div class="timeline-controls"><span class="subtle" id="event-count">0 sự kiện</span><label class="follow-label"><input type="checkbox" id="follow-events" checked> Tự cuộn</label></div></div><div class="timeline-columns" aria-hidden="true"><span>THỜI GIAN</span><span>PEER</span><span>SỰ KIỆN</span><span>CHI TIẾT</span></div><div class="event-log" id="event-log" tabindex="0" aria-label="Nhật ký sự kiện demo"><div class="log-empty">Nhật ký sẽ ghi lại các yêu cầu HTTP, chunk nhận được, lỗi hash và lần thử lại.</div></div></section>
+      <footer class="page-footer"><span><span class="footer-dot"></span> DS02 · Hệ thống chia sẻ file ngang hàng</span><span>Kho riêng từng peer · HTTP binary chunks · SHA-256</span></footer>
+      <div class="sr-only" id="announcement" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+</body>
+</html>

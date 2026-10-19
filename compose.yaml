@@ -1,0 +1,68 @@
+services:
+  tracker:
+    build: .
+    command: python -m p2psim.tracker
+    environment:
+      PORT: 8000
+      TRACKER_TOKEN: ${TRACKER_TOKEN:?Copy .env.example to .env}
+      PEER_TTL: 12
+    ports:
+      - '8000:8000'
+    networks: [p2p]
+    healthcheck:
+      test: ['CMD', 'python', '-c', "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  peer-a:
+    build: .
+    command: python -m p2psim.peer
+    environment: &peer_env
+      PORT: 9000
+      TRACKER_URL: http://tracker:8000
+      TRACKER_TOKEN: ${TRACKER_TOKEN}
+      P2P_TOKEN: ${P2P_TOKEN}
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
+      PEER_DATA_DIR: /data
+      UPLOAD_DELAY_MS: ${UPLOAD_DELAY_MS:-65}
+      PEER_ID: peer-a
+      PUBLIC_URL: http://peer-a:9000
+    volumes:
+      - ./runtime/peer-a:/data
+      - ./sample_files:/data/shared:ro
+    ports:
+      - '9001:9000'
+    networks: [p2p]
+    depends_on:
+      tracker: {condition: service_healthy}
+  peer-b:
+    build: .
+    command: python -m p2psim.peer
+    environment:
+      <<: *peer_env
+      PEER_ID: peer-b
+      PUBLIC_URL: http://peer-b:9000
+    volumes:
+      - ./runtime/peer-b:/data
+    ports:
+      - '9002:9000'
+    networks: [p2p]
+    depends_on:
+      tracker: {condition: service_healthy}
+  peer-c:
+    build: .
+    command: python -m p2psim.peer
+    environment:
+      <<: *peer_env
+      PEER_ID: peer-c
+      PUBLIC_URL: http://peer-c:9000
+    volumes:
+      - ./runtime/peer-c:/data
+    ports:
+      - '9003:9000'
+    networks: [p2p]
+    depends_on:
+      tracker: {condition: service_healthy}
+networks:
+  p2p:
+    driver: bridge
