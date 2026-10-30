@@ -206,9 +206,3 @@ Dừng Docker bằng `docker compose down`. Thí nghiệm hiệu năng tùy ch�
 Kết quả là `dist/DS02-P2P-BitTorrent-source.zip` và file kiểm tra `dist/DS02-P2P-BitTorrent-source.zip.sha256`. Bên trong ZIP có mã nguồn, giao diện, test, tài liệu Markdown, file đề môn học và danh sách SHA-256 của các file nguồn. Người nhận giải nén rồi làm từ mục 1–2 để chạy cùng giao diện trên máy của họ.
 
 Gói nguồn loại bỏ `.env`, môi trường `.venv`, dữ liệu `runtime/`, file người dùng đã chọn và các file sinh ra khi demo. Báo cáo hiện hành là [docs/REPORT.md](docs/REPORT.md); bản PDF báo cáo sinh sẵn được bỏ khỏi gói để tránh dùng nội dung cũ.
-
-## Phạm vi của dự án
-
-Đây là mô hình phục vụ học tập, mô phỏng nguyên lý BitTorrent. Dự án chưa triển khai giao thức BitTorrent thực, DHT, magnet link, rarest-first, choking, NAT traversal, TLS hoặc định danh mật mã riêng cho từng peer. Tracker lưu trạng thái trong RAM và là một điểm lỗi đơn; peer đang chạy cần công bố lại sau khi tracker khởi động lại. Hai file cùng tên trên cùng peer có thể ghi đè file tải hoàn chỉnh trước đó.
-
-Dashboard giới hạn file 32 MiB để demo; API peer có giới hạn riêng tối đa 1 GiB/file, 4 MiB/chunk và kiểm soát kích thước phản hồi. Token chung và HTTP hiện tại phù hợp môi trường demo được kiểm soát. Xem [báo cáo](docs/REPORT.md) để biết giới hạn và hướng phát triển.
