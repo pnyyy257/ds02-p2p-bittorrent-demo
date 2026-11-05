@@ -84,6 +84,72 @@ sequenceDiagram
     B->>B: SHA256(final file) == file_hash
 ```
 
+## Luồng xác minh, checkpoint và phục hồi
+
+### 1. Từ dữ liệu nhận được đến chunk có thể chia sẻ
+
+Trong `PeerNode._fetch_chunk()` của `src/p2psim/peer.py`, một lượt nhận thành công đi qua các bước sau:
+
+1. Đọc phản hồi HTTP đến EOF với giới hạn bằng độ dài chunk dự kiến cộng một byte; từ chối sớm nếu `Content-Length` đã vượt giới hạn.
+2. `validate_chunk()` đối chiếu **cả độ dài và SHA-256** với metadata của index đang tải. Dữ liệu không hợp lệ bị loại và chuyển sang cơ chế retry/chọn nguồn khác, không được thêm vào tập chunk hợp lệ.
+3. Trong `state_lock`, gọi `atomic_bytes()` để lưu chunk, thêm index vào `local.chunks`, rồi gọi `_persist()` để ghi checkpoint.
+4. Ghi sự kiện `DOWNLOAD_CHUNK` và gửi `announce()` để tracker biết inventory mới. HTTP upload của peer có thể phục vụ chunk đã lưu và có trong `local.chunks` mà không đợi `local.completed=true`.
+
+Vì vậy, **xác minh từng chunk là điều kiện để nhận và chia sẻ phần dữ liệu đó; xác minh toàn file là điều kiện để công bố kết quả tải hoàn chỉnh**. Tracker chỉ giữ metadata/inventory. Byte chunk vẫn truyền trực tiếp giữa các peer.
+
+```mermaid
+flowchart TD
+    A[Nhận chunk qua HTTP có giới hạn] --> B{Đúng độ dài và SHA-256?}
+    B -- Không --> C[Loại dữ liệu không hợp lệ]
+    C --> R{Còn lượt thử?}
+    R -- Có --> S[Chọn lại nguồn phù hợp]
+    S --> A
+    R -- Không --> T[Job thất bại]
+    B -- Có --> D[Ghi chunk nguyên tử]
+    D --> E[Cập nhật local.chunks và checkpoint]
+    E --> F[Chunk có thể được upload khi file còn tải dở]
+    E --> G[Announce inventory đến tracker]
+    E --> H{Đã đủ mọi chunk?}
+    H -- Chưa --> A
+    H -- Đủ --> I[Kiểm tra lại chunk và ghép theo index]
+    I --> J{Đúng kích thước và SHA-256 toàn file?}
+    J -- Có --> K[Đổi tên file tạm và lưu completed=true]
+    J -- Không --> L[Job thất bại và ghi lỗi]
+```
+
+Nếu announce lỗi sau khi checkpoint đã lưu, chunk hợp lệ vẫn tồn tại cục bộ. Lượt tải có thể thử lại và heartbeat định kỳ có thể công bố lại inventory. Trạng thái tracker vì vậy nhất quán cuối cùng với kho chunk, không cập nhật đồng thời tuyệt đối với thao tác ghi đĩa.
+
+### 2. Checkpoint lưu gì và bảo đảm đến đâu?
+
+Mỗi peer lưu dữ liệu dưới thư mục `PEER_DATA_DIR` riêng:
+
+| Đối tượng | Đường dẫn trong thư mục peer | Nội dung |
+|---|---|---|
+| Chunk | `storage/<file_id>/<index:08d>.part` | Byte của từng chunk; ví dụ index 3 là `00000003.part` |
+| Checkpoint | `storage/<file_id>/state.json` | `metadata`, danh sách `chunks` và cờ `completed` |
+| File kết quả | `downloads/<file_name>` | File ghép đã qua bước xác minh toàn file |
+
+`atomic_bytes()` và `atomic_json()` trong `common.py` ghi file tạm cùng thư mục, flush/fsync rồi `os.replace()`. Mỗi file được thay thế nguyên tử; **chunk và checkpoint không phải một giao dịch nguyên tử chung**. Nếu tiến trình dừng sau khi lưu chunk nhưng trước khi checkpoint ghi nhận index, lần khởi động sau chỉ nạp những index có trong checkpoint; file chunk chưa được ghi nhận có thể phải tải lại. Thiết kế ưu tiên xác minh được dữ liệu thay vì coi mọi file `.part` tìm thấy là hợp lệ.
+
+### 3. Xác minh toàn file trước khi hoàn tất
+
+Sau khi các worker kết thúc mà không có lỗi, `_run_download()` đọc chunk theo index từ `0` đến `chunk_count - 1`, kiểm tra lại từng chunk và ghi vào `downloads/.<file_id>.partial`. Đồng thời chương trình tính lại SHA-256 toàn file. Chỉ khi kích thước và hash khớp metadata, file tạm mới được thay thế sang tên kết quả, checkpoint ghi `completed=true` và job chuyển sang `completed`. Nhận đủ số lượng chunk chưa đủ để bỏ qua bước xác minh này.
+
+### 4. Khởi động lại và tiếp tục tải
+
+`PeerNode._load_states()` chạy khi tạo peer, đọc các `state.json` và kiểm tra metadata cùng tên thư mục File ID. Với mỗi index được checkpoint khai báo, chương trình kiểm tra phạm vi index, sự tồn tại của file chunk, độ dài và hash thực tế. Chỉ chunk vượt qua các kiểm tra mới được đưa vào `local.chunks`; bản thiếu/hỏng phải được tải lại. Checkpoint không đọc được hoặc sai cấu trúc được ghi log `IGNORE_BAD_STATE` và bỏ qua. Trạng thái hợp lệ được ghi log `RECOVER`.
+
+Sau khi peer bắt đầu chạy, heartbeat công bố lại inventory đã phục hồi. **Chương trình không tự khởi chạy lại job download**: người điều khiển gửi lại `POST /api/downloads` hoặc lệnh CLI download với cùng File ID. Peer tra cứu tracker, đối chiếu metadata và chỉ đưa các index chưa có trong `local.chunks` vào hàng đợi. Nếu toàn bộ chunk được khôi phục, bước ghép vẫn có thể chạy mà không tải lại chunk.
+
+Cờ `completed` khi nạp checkpoint chỉ được giữ nếu checkpoint đã đánh dấu hoàn tất và mọi chunk được xác minh. Khi nhận yêu cầu download, `begin_download()` còn kiểm tra file kết quả có tồn tại và đúng hash trước khi trả `already downloaded`; nếu không, nó tiếp tục luồng ghép/xác minh từ các chunk cục bộ. Không dùng riêng cờ checkpoint làm bằng chứng file kết quả còn đúng.
+
+### 5. Điều kiện tái lập và phạm vi kiểm chứng
+
+- Giữ nguyên thư mục dữ liệu của peer qua restart, dùng cùng File ID và bảo đảm tracker/nguồn còn truy cập được. Không dùng thư mục của peer khác để thay cho truyền dữ liệu qua mạng.
+- Mỗi lượt dashboard và mỗi lần chạy `run_local.py` tạo thư mục mới, nên chạy lại một demo mới không phải tiếp tục job cũ. Muốn kiểm chứng resume phải khởi động lại peer với đúng `PEER_DATA_DIR` trước đó.
+- Theo dõi `RECOVER`, số chunk đã có, các sự kiện `DOWNLOAD_CHUNK` cho phần thiếu và hash file cuối. Nếu không còn nguồn giữ chunk cần thiết, resume không thể tự tái tạo byte từ mã hash.
+- `test_restart_recovers_verified_chunk_state` hiện xác nhận tạo lại `PeerNode` và nạp kho chunk của một lần tải đã hoàn tất. Bài này chưa chứng minh end-to-end thao tác kill tiến trình đang tải rồi restart; cần ghi kết quả riêng nếu thực hiện kịch bản đó.
+
 ## Recovery and failure model
 
 - **Crash-stop / transient loss:** 2s connect timeout, 6s request timeout, bounded retries (default 12) across discovered alternative peers; TTL expires silent peers from listing.
