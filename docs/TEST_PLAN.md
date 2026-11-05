@@ -67,6 +67,8 @@ For V08–V10, the browser uploads the original binary to `POST /api/source?name
 
 **Live process-failure variation:** `docker compose stop peer-a` during B download while C already has the content. Restart A with `docker compose start peer-a`. For a reproducible automatic demo without physically stopping a container, `/api/debug/serving/false` returns 503 and triggers retry/fallback; it is explicitly a *simulated* stop.
 
+Retry diagnostics in `tests/test_chunk_stream.py` also verify that a failed job exposes the chunk index, configured attempt count, source on the final attempt and final error in status and `DOWNLOAD_FAILED`. Real HTTP 503 then 504 responses must stop after two attempts and report 504. If the source disappears before the final attempt, report `last source=none` rather than blaming the earlier source; a tracker timeout with an empty message must report `TimeoutError`. Failed chunks must remain absent from verified storage.
+
 ## Security/invalid-data tests (2+)
 
 | ID | Test | Expected |

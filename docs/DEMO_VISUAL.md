@@ -61,6 +61,8 @@ Nếu cần minh họa dừng hẳn tiến trình, dùng kịch bản Docker/CLI
 
 ## Lưu minh chứng và kiểm chứng lại
 
+Nếu tác vụ hết lượt thử, xem trường lỗi của trạng thái tải hoặc log `DOWNLOAD_FAILED`: thông báo gồm chunk, số lượt đã thử, `last source` và `last error`. Ví dụ `last source=peer-a; last error=source peer-a HTTP 503` cho biết lỗi cuối đến từ A; `last source=none` cho biết lượt cuối chưa chọn được peer, cần kiểm tra tracker hoặc availability. Đây là hướng dẫn chẩn đoán khi demo thất bại, không thay đổi bốn tình huống demo.
+
 Với mỗi demo, lưu ảnh trạng thái chunk và sự kiện quan trọng, kết quả kiểm chứng, đường dẫn file đầu ra và SHA-256 hiển thị trên giao diện. Log gốc ở `runtime/visual-*/tracker.log`, `peer-a.log`, `peer-b.log`, `peer-c.log`. Dashboard giữ các sự kiện gần đây; dùng log khi cần đối chiếu đầy đủ hơn.
 
 Với file tự chọn, lưu thêm ảnh file đầu ra mở bằng ứng dụng và kết quả hash trùng bản gốc. File nguồn được giữ trong `runtime/visual-inputs/` của controller rồi cấp riêng cho A; file tải xong nằm trong `runtime/visual-*/peer-b/downloads/` với tên gốc.

@@ -354,6 +354,8 @@ class PeerNode:
     async def _fetch_chunk(self, job: Job, local: LocalFile, idx: int, retries: int) -> None:
         fid = local.meta.file_id
         tried: set[str] = set()
+        last_source = "none"
+        last_error = "no attempts made"
         for attempt in range(retries):
             source = None
             try:
@@ -409,6 +411,8 @@ class PeerNode:
             except asyncio.CancelledError:
                 raise
             except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError, OSError) as exc:
+                last_source = source["peer_id"] if source is not None else "none"
+                last_error = str(exc) or type(exc).__name__
                 job.failed_requests += 1
                 log.warning("event=RETRY peer=%s file=%s chunk=%d attempt=%d err=%s", self.peer_id, fid[:12], idx, attempt + 1, exc)
                 details = {"chunk": idx, "attempt": attempt + 1, "error": str(exc)}
@@ -417,7 +421,9 @@ class PeerNode:
                 self.record_event("RETRY", fid, **details)
                 if attempt + 1 < retries:
                     await asyncio.sleep(min(0.2 * (attempt + 1), 1.0))
-        raise RuntimeError(f"exhausted {retries} attempts")
+        raise RuntimeError(
+            f"exhausted {retries} attempts; last source={last_source}; last error={last_error}"
+        )
 
     def status(self, fid: str) -> dict:
         local = self.files.get(fid)

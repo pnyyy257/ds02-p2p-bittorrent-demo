@@ -111,6 +111,8 @@ Checkpoint được ghi nguyên tử, cùng với việc xác minh lại mọi c
 
 Các lỗi được xét gồm nguồn tạm dừng phục vụ, timeout kết nối, peer bị dừng đột ngột, chunk bị thay đổi ngoài mong đợi, tracker mất kết nối và tiến trình download bị đóng giữa chừng. Với kết nối thất bại, worker tải ghi log sự kiện RETRY, tra cứu lại nguồn và ưu tiên chọn peer chưa thử.
 
+Khi hết lượt thử, trường `error` của trạng thái tải và sự kiện `DOWNLOAD_FAILED` giữ chỉ số chunk, số lượt đã thử, nguồn của lượt cuối và nguyên nhân cuối cùng. Ví dụ: `chunk 0: exhausted 2 attempts; last source=peer-a; last error=source peer-a HTTP 504`. Nếu lượt cuối không chọn được nguồn, `last source=none`; lỗi timeout không có thông điệp được biểu diễn bằng tên lớp `TimeoutError`. Thông tin này giúp phân biệt lỗi nguồn với lỗi khám phá mà không thay đổi giới hạn retry hay thuật toán chuyển nguồn.
+
 Trong tình huống nguồn A ngừng phục vụ khi B đang tải, B vẫn nhận các chunk còn thiếu từ C nếu C đã sở hữu các chunk đó. Khả năng phục hồi phụ thuộc vào tính sẵn có của bản sao; nếu chỉ một peer có chunk và peer đó offline, không thuật toán nào tự tạo lại dữ liệu bị mất.
 
 Với chunk sai, downloader loại bỏ chunk không hợp lệ, tăng bộ đếm invalid_chunks và thử nguồn khác. Với tracker mất kết nối, các yêu cầu khám phá mới có thể thất bại; khi tracker hoạt động lại, peers sẽ đăng ký lại qua heartbeat. Thiết kế hiện tại không có tracker dự phòng nên tracker là một điểm lỗi đơn (single point of failure).

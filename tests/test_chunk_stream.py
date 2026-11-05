@@ -117,3 +117,73 @@ async def test_declared_oversized_chunk_is_rejected_before_validation(tmp_path):
         assert not local.chunks
         assert job.failed_requests == 1 and job.invalid_chunks == 0
         assert list(node.events)[0]["error"] == "oversized chunk response"
+
+
+@pytest.mark.asyncio
+async def test_retry_exhaustion_preserves_final_source_and_error_in_job_status(tmp_path):
+    requests = []
+
+    async def chunk(request):
+        status = 503 if not requests else 504
+        requests.append(status)
+        return web.Response(status=status)
+
+    async with source_stack(tmp_path, b"valid chunk", chunk) as (node, local, job):
+        await node._run_download(job, parallelism=1, retries=2)
+
+        status = node.status(job.file_id)
+        assert status["status"] == "failed"
+        assert status["error"] == (
+            "chunk 0: exhausted 2 attempts; last source=peer-a; "
+            "last error=source peer-a HTTP 504"
+        )
+        assert requests == [503, 504]
+        assert status["failed_requests"] == 2
+        assert not local.chunks and not node.chunk_path(job.file_id, 0).exists()
+        assert list(node.events)[-1]["error"] == status["error"]
+
+
+@pytest.mark.asyncio
+async def test_retry_exhaustion_does_not_blame_previous_source_when_none_remain(tmp_path, monkeypatch):
+    requests = []
+
+    async def chunk(request):
+        requests.append(request.path)
+        return web.Response(status=503)
+
+    async with source_stack(tmp_path, b"valid chunk", chunk) as (node, local, job):
+        lookup = node.get_tracker_file
+
+        async def lookup_until_source_leaves(fid):
+            info = await lookup(fid)
+            if requests:
+                info["peers"] = []
+            return info
+
+        monkeypatch.setattr(node, "get_tracker_file", lookup_until_source_leaves)
+        await node._run_download(job, parallelism=1, retries=2)
+
+        assert node.status(job.file_id)["error"] == (
+            "chunk 0: exhausted 2 attempts; last source=none; "
+            "last error=no online peer has chunk 0"
+        )
+        assert len(requests) == 1 and job.failed_requests == 2
+        assert not local.chunks
+
+
+@pytest.mark.asyncio
+async def test_retry_exhaustion_names_timeout_when_exception_message_is_empty(tmp_path, monkeypatch):
+    async def chunk(request):
+        pytest.fail("no chunk request should be sent when tracker lookup times out")
+
+    async with source_stack(tmp_path, b"valid chunk", chunk) as (node, local, job):
+        async def tracker_timeout(fid):
+            raise asyncio.TimeoutError()
+
+        monkeypatch.setattr(node, "get_tracker_file", tracker_timeout)
+        await node._run_download(job, parallelism=1, retries=1)
+
+        assert node.status(job.file_id)["error"] == (
+            "chunk 0: exhausted 1 attempts; last source=none; last error=TimeoutError"
+        )
+        assert job.failed_requests == 1 and not local.chunks

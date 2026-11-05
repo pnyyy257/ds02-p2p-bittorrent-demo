@@ -115,6 +115,7 @@ Bản ZIP đã được giải nén vào thư mục mới, cài bằng môi trư
 | Trang không kết nối được | Kiểm tra Terminal còn chạy và mở đúng địa chỉ/cổng vừa in ra |
 | Chọn file bị từ chối | Kiểm tra kích thước 8 byte–32 MiB và tên file; có thể thử **Dùng file mẫu** |
 | Demo báo lỗi | Xem thông báo và log trong thư mục `runtime/visual-*/` của lượt đó; chạy lại để tạo bộ peer mới |
+| Tải thất bại vì hết lượt thử (`exhausted ... attempts`) | Trường `error` của trạng thái tải và log `DOWNLOAD_FAILED` cho biết chunk bị lỗi, số lượt đã thử, `last source` và `last error`. `last source=none` nghĩa là lượt cuối chưa chọn được nguồn, chẳng hạn tracker timeout hoặc không còn peer có chunk. |
 
 ## 7. Kiến trúc và cách đọc mã nguồn
 
